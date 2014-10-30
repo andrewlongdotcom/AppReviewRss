@@ -12,53 +12,9 @@ using System.Xml;
 
 namespace AppReviewRSS.Web
 {
-    public class SyndicationFeedFormatter : MediaTypeFormatter
+    public class SyndicationFeedFormatter
     {
-        private readonly string atom = "application/atom+xml";
-        private readonly string rss = "application/rss+xml";
-        private readonly string text = "text/html";
-
-        public SyndicationFeedFormatter()
-        {
-            SupportedMediaTypes.Add(new MediaTypeHeaderValue(atom));
-            SupportedMediaTypes.Add(new MediaTypeHeaderValue(rss));
-            SupportedMediaTypes.Add(new MediaTypeHeaderValue(text));
-        }
-
-        public SyndicationFeedFormatter(string format)
-        {
-            this.AddUriPathExtensionMapping("rss", new MediaTypeHeaderValue(format));
-            this.AddQueryStringMapping("formatter", "rss", new MediaTypeHeaderValue(format));
-        }
-
-        Func<Type, bool> SupportedType = (type) =>
-        {
-            if (type == typeof(Portable.Review) || type == typeof(IEnumerable<Portable.Review>))
-                return true;
-            else
-                return false;
-        };
-
-        public override bool CanReadType(Type type)
-        {
-            return SupportedType(type);
-        }
-
-        public override bool CanWriteType(Type type)
-        {
-            return SupportedType(type);
-        }
-
-        public override Task WriteToStreamAsync(Type type, object value, Stream writeStream, System.Net.Http.HttpContent content, System.Net.TransportContext transportContext)
-        {
-            return Task.Factory.StartNew(() =>
-            {
-                if (type == typeof(Portable.Review) || type == typeof(IEnumerable<Portable.Review>))
-                    BuildSyndicationFeed((List<Portable.Review>)value, writeStream, content.Headers.ContentType.MediaType);
-            });
-        }
-
-        public static string GetSyndicationFeedAsString(List<Portable.Review> reviews)
+        public static string GetSyndicationFeedAsString(List<Models.ReviewModel> reviews)
         {
             if (reviews == null || reviews.Count == 0)
             {
@@ -84,31 +40,23 @@ namespace AppReviewRSS.Web
             }
         }
 
-        private void BuildSyndicationFeed(List<Portable.Review> reviews, Stream stream, string contenttype)
+        private void BuildSyndicationFeed(List<Models.ReviewModel> reviews, Stream stream, string contenttype)
         {
             SyndicationFeed feed = GetSyndicationFeed(reviews);
 
             using (XmlWriter writer = XmlWriter.Create(stream))
             {
-                if (string.Equals(contenttype, atom))
-                {
-                    Atom10FeedFormatter atomformatter = new Atom10FeedFormatter(feed);
-                    atomformatter.WriteTo(writer);
-                }
-                else
-                {
-                    Rss20FeedFormatter rssformatter = new Rss20FeedFormatter(feed)
-                        {
-                            SerializeExtensionsAsAtom = false,
-                            PreserveAttributeExtensions = true,
-                            PreserveElementExtensions = true
-                        };
-                    rssformatter.WriteTo(writer);
-                }
+                Rss20FeedFormatter rssformatter = new Rss20FeedFormatter(feed)
+                    {
+                        SerializeExtensionsAsAtom = false,
+                        PreserveAttributeExtensions = true,
+                        PreserveElementExtensions = true
+                    };
+                rssformatter.WriteTo(writer);
             }
         }
 
-        private static SyndicationFeed GetSyndicationFeed(List<Portable.Review> reviews)
+        private static SyndicationFeed GetSyndicationFeed(List<Models.ReviewModel> reviews)
         {
             if (reviews == null ||
                 reviews.Count == 0)
@@ -122,7 +70,7 @@ namespace AppReviewRSS.Web
                 Id = reviews[0].StoreUrl
             };
 
-            foreach (Portable.Review review in reviews)
+            foreach (Models.ReviewModel review in reviews)
             {
                 items.Add(BuildSyndicationItem(review));
             }
@@ -131,7 +79,7 @@ namespace AppReviewRSS.Web
             return feed;
         }
 
-        private static SyndicationItem BuildSyndicationItem(Portable.Review review)
+        private static SyndicationItem BuildSyndicationItem(Models.ReviewModel review)
         {
             var item = new SyndicationItem(
                 string.Format("Another {0}-star review!", review.ReviewRating),

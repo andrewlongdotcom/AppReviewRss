@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.30723.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppReviewRSS.Portable", "AppReviewRSS.Portable\AppReviewRSS.Portable.csproj", "{C702F681-8550-4AE1-835E-9A16D95A9551}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppReviewRSS.Web", "AppReviewRSS.Web\AppReviewRSS.Web.csproj", "{C98C9722-A3B7-4871-9092-6DB0F484CA4B}"
 EndProject
 Global
@@ -13,10 +11,6 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{C702F681-8550-4AE1-835E-9A16D95A9551}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C702F681-8550-4AE1-835E-9A16D95A9551}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{C702F681-8550-4AE1-835E-9A16D95A9551}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C702F681-8550-4AE1-835E-9A16D95A9551}.Release|Any CPU.Build.0 = Release|Any CPU
 		{C98C9722-A3B7-4871-9092-6DB0F484CA4B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{C98C9722-A3B7-4871-9092-6DB0F484CA4B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C98C9722-A3B7-4871-9092-6DB0F484CA4B}.Release|Any CPU.ActiveCfg = Release|Any CPU
