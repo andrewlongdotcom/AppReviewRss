@@ -14,6 +14,7 @@ namespace AppReviewRSS.Portable
         public int ReviewRating { get; set; }
         public string ReviewText { get; set; }
         public string StoreUrl { get; set; }
+        public string AppId { get; set; }
 
         public string ReviewTitle
         {

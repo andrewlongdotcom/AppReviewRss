@@ -86,6 +86,7 @@ namespace AppReviewRSS.Portable
                     newReview.ReviewRating <= maximumRatingToIncludeInFeed)
                 {
                     newReview.StoreUrl = appStoreUrl;
+                    newReview.AppId = applicationId;
                     reviews.Add(newReview);
                 }
             }

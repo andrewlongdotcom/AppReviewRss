@@ -54,32 +54,39 @@ namespace AppReviewRSS.Web
             return Task.Factory.StartNew(() =>
             {
                 if (type == typeof(Portable.Review) || type == typeof(IEnumerable<Portable.Review>))
-                    BuildSyndicationFeed(value, writeStream, content.Headers.ContentType.MediaType);
+                    BuildSyndicationFeed((List<Portable.Review>)value, writeStream, content.Headers.ContentType.MediaType);
             });
         }
 
-        private void BuildSyndicationFeed(object models, Stream stream, string contenttype)
+        public static string GetSyndicationFeedAsString(List<Portable.Review> reviews)
         {
-            List<SyndicationItem> items = new List<SyndicationItem>();
-            var feed = new SyndicationFeed()
+            if (reviews == null || reviews.Count == 0)
             {
-                Title = new TextSyndicationContent("My Feed")
-            };
+                return null;
+            }
 
-            if (models is IEnumerable<Portable.Review>)
+            SyndicationFeed feed = GetSyndicationFeed(reviews);
+
+            using (TextWriter textWriter = new UTF8StringWriter())
             {
-                var enumerator = ((IEnumerable<Portable.Review>)models).GetEnumerator();
-                while (enumerator.MoveNext())
+                using (XmlWriter xmlWriter = XmlWriter.Create(textWriter))
                 {
-                    items.Add(BuildSyndicationItem(enumerator.Current));
-                }
-            }
-            else
-            {
-                items.Add(BuildSyndicationItem((Portable.Review)models));
-            }
+                    Rss20FeedFormatter rssformatter = new Rss20FeedFormatter(feed)
+                    {
+                        SerializeExtensionsAsAtom = false,
+                        PreserveAttributeExtensions = true,
+                        PreserveElementExtensions = true
+                    };
 
-            feed.Items = items;
+                    rssformatter.WriteTo(xmlWriter);
+                }
+                return textWriter.ToString();
+            }
+        }
+
+        private void BuildSyndicationFeed(List<Portable.Review> reviews, Stream stream, string contenttype)
+        {
+            SyndicationFeed feed = GetSyndicationFeed(reviews);
 
             using (XmlWriter writer = XmlWriter.Create(stream))
             {
@@ -90,22 +97,56 @@ namespace AppReviewRSS.Web
                 }
                 else
                 {
-                    Rss20FeedFormatter rssformatter = new Rss20FeedFormatter(feed);
+                    Rss20FeedFormatter rssformatter = new Rss20FeedFormatter(feed)
+                        {
+                            SerializeExtensionsAsAtom = false,
+                            PreserveAttributeExtensions = true,
+                            PreserveElementExtensions = true
+                        };
                     rssformatter.WriteTo(writer);
                 }
             }
         }
 
-        private SyndicationItem BuildSyndicationItem(Portable.Review review)
+        private static SyndicationFeed GetSyndicationFeed(List<Portable.Review> reviews)
         {
-            var item = new SyndicationItem()
+            if (reviews == null ||
+                reviews.Count == 0)
             {
-                Title = new TextSyndicationContent(string.Format("Another {0}-star review!", review.ReviewRating)),
-                BaseUri = new Uri(review.StoreUrl),
-                LastUpdatedTime = review.ReviewDate,
-                Content = new TextSyndicationContent(review.ReviewText)
+                return null;
+            }
+
+            List<SyndicationItem> items = new List<SyndicationItem>();
+            var feed = new SyndicationFeed("WP8 App Reviews", "", new Uri(reviews[0].StoreUrl))
+            {
+                Id = reviews[0].StoreUrl
+            };
+
+            foreach (Portable.Review review in reviews)
+            {
+                items.Add(BuildSyndicationItem(review));
+            }
+
+            feed.Items = items;
+            return feed;
+        }
+
+        private static SyndicationItem BuildSyndicationItem(Portable.Review review)
+        {
+            var item = new SyndicationItem(
+                string.Format("Another {0}-star review!", review.ReviewRating),
+                review.ReviewText,
+                new Uri(review.StoreUrl))
+            {
+                Id = string.Format(
+                    "{0}_{1}",
+                    review.AppId,
+                    review.Author.Replace(" ", string.Empty)),
+                LastUpdatedTime = review.ReviewDate.ToLocalTime(),
+                PublishDate = review.ReviewDate.ToLocalTime()
             };
             item.Authors.Add(new SyndicationPerson() { Name = review.Author });
+
             return item;
         }
 
