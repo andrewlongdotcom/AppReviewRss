@@ -48,6 +48,12 @@ namespace AppReviewRSS.Web.Controllers
 
             if (ConfigurationManager.AppSettings["WhitelistAppIds"].Contains(id))
             {
+                string cacheKey = string.Format(
+                    "{0}_{1}_{2}",
+                    id,
+                    minimumReviewValue,
+                    maximumReviewValue);
+
                 List<Models.ReviewModel> reviews = await _GetReviews(
                     id,
                     minimumReviewValue.Value,
@@ -81,41 +87,98 @@ namespace AppReviewRSS.Web.Controllers
                 appStoreUrlBase,
                 applicationId);
 
+            HttpResponseMessage response = await _GetHttpResponse(appStoreUrl);
+            string uri = response.RequestMessage.RequestUri.ToString();
+            string pageContent = await response.Content.ReadAsStringAsync();
+            
+            // first get en-us store reviews
+            List<Models.ReviewModel> enUsReviews = _ProcessLocaleReviews(
+                pageContent,
+                minimumRatingToIncludeInFeed,
+                maximumRatingToIncludeInFeed,
+                uri,
+                applicationId);
+
+            if (ConfigurationManager.AppSettings["MarketsToInclude"] != null &&
+                !string.IsNullOrEmpty(ConfigurationManager.AppSettings["MarketsToInclude"]))
+            {
+                // cycle through all specified markets
+                string markets = ConfigurationManager.AppSettings["MarketsToInclude"];
+                string[] marketsArray = (markets.Contains(",") ? ConfigurationManager.AppSettings["MarketsToInclude"].Split(",".ToCharArray(), StringSplitOptions.RemoveEmptyEntries) : new string[] {ConfigurationManager.AppSettings["MarketsToInclude"]});
+
+                foreach (string market in marketsArray)
+                {
+                    if (market.Equals("en-us", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        reviews.AddRange(enUsReviews);
+                    }
+                    else
+                    {
+                        response = await _GetHttpResponse(uri.ToLower().Replace("en-us", market));
+                        pageContent = await response.Content.ReadAsStringAsync();
+                        reviews.AddRange(_ProcessLocaleReviews(
+                            pageContent,
+                            minimumRatingToIncludeInFeed,
+                            maximumRatingToIncludeInFeed,
+                            appStoreUrl,
+                            applicationId));
+                    }
+                }
+
+                return reviews.OrderByDescending(r => r.ReviewDate).ToList();
+            }
+            else
+            {
+                // just return en-us
+                return enUsReviews;
+            }
+        }
+
+        private async Task<HttpResponseMessage> _GetHttpResponse(string url)
+        {
             HttpClient httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.Add("user-agent", "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2; WOW64; Trident/6.0)");
 
-            HttpResponseMessage response = await httpClient.GetAsync(
-                appStoreUrl,
+            return await httpClient.GetAsync(
+                url,
                 HttpCompletionOption.ResponseContentRead);
+        }
 
-            string pageContent = await response.Content.ReadAsStringAsync();
-            
+        private List<Models.ReviewModel> _ProcessLocaleReviews(
+            string pageContent,
+            int minimumRatingToIncludeInFeed,
+            int maximumRatingToIncludeInFeed,
+            string appStoreUrl,
+            string applicationId)
+        {
+            List<Models.ReviewModel> reviews = new List<Models.ReviewModel>();
+
             HtmlDocument htmlDocument = new HtmlDocument();
             htmlDocument.OptionOutputAsXml = true;
             htmlDocument.LoadHtml(pageContent);
-            
+
             HtmlNode document = htmlDocument.DocumentNode;
             HtmlNode htmlNode = document.ChildNodes["html"];
 
             HtmlNode reviewNode = htmlNode
                 .Descendants("div")
                 .Where(n => n.HasAttributes && n.Attributes["id"] != null && n.Attributes["id"].Value.Equals("reviews", StringComparison.CurrentCultureIgnoreCase)).FirstOrDefault();
-            
-            foreach(HtmlNode review in reviewNode.Descendants("li").Where(n => n.HasAttributes && n.Attributes["itemprop"] != null))
+
+            foreach (HtmlNode review in reviewNode.Descendants("li").Where(n => n.HasAttributes && n.Attributes["itemprop"] != null))
             {
                 Models.ReviewModel newReview = new Models.ReviewModel();
 
                 // 2 div tags in each review: reviewDetails and reviewText
-                foreach(HtmlNode reviewSection in review.Descendants("div"))
+                foreach (HtmlNode reviewSection in review.Descendants("div"))
                 {
-                    if (reviewSection.HasAttributes && 
-                        reviewSection.Attributes["class"] != null && 
+                    if (reviewSection.HasAttributes &&
+                        reviewSection.Attributes["class"] != null &&
                         reviewSection.Attributes["class"].Value.Equals("reviewDetails", StringComparison.CurrentCultureIgnoreCase))
                     {
                         // review details
-                        foreach(HtmlNode metaNode in reviewSection.Descendants("meta"))
+                        foreach (HtmlNode metaNode in reviewSection.Descendants("meta"))
                         {
-                            switch(metaNode.Attributes["itemprop"].Value.ToLower())
+                            switch (metaNode.Attributes["itemprop"].Value.ToLower())
                             {
                                 case "author":
                                     newReview.Author = metaNode.Attributes["content"].Value;
@@ -130,7 +193,7 @@ namespace AppReviewRSS.Web.Controllers
                         }
                     }
 
-                    if (reviewSection.HasAttributes && 
+                    if (reviewSection.HasAttributes &&
                         reviewSection.Attributes["class"] != null &&
                         reviewSection.Attributes["class"].Value.Equals("reviewText", StringComparison.CurrentCultureIgnoreCase))
                     {
